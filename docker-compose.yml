@@ -1,0 +1,73 @@
+services:
+  spark-master:
+    build:
+      context: ./docker_image/spark
+      dockerfile: Dockerfile
+    container_name: "spark-master"
+    ports:
+      - "7077:7077"  # Spark master port
+      - "8081:8080"  # Spark master web UI port
+    expose: 
+      - "7077"
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      - SPARK_USER=spark
+    volumes:
+      - ./docker_image/spark/conf/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
+      - ./docker_image/spark/conf/log4j.properties:/opt/bitnami/spark/conf/log4j.properties
+    networks:
+      - data_network
+
+  spark-worker-1:
+    image: docker.io/bitnami/spark:3.5.2
+    container_name: "spark-worker-1"
+    env_file:
+      - .env
+    depends_on:
+      - spark-master
+    networks:
+      - data_network
+
+  spark-worker-2:
+    image: docker.io/bitnami/spark:3.5.2
+    container_name: "spark-worker-2"
+    env_file:
+      - .env
+    depends_on:
+      - spark-master
+    networks:
+      - data_network
+  
+  jupyterlab:
+    build: 
+      context: ./docker_image/jupyterlab
+      dockerfile: Dockerfile
+    container_name: "jupyterlab"
+    user: root
+    environment:
+      - JUPYTER_ENABLE_LAB="yes"
+      - GRANT_SUDO="yes"
+      - MLFLOW_S3_ENDPOINT_URL=http://minio:9000/ 
+      - AWS_ACCESS_KEY_ID=minio
+      - AWS_SECRET_ACCESS_KEY=minio123
+    volumes:
+      - ./docker_image/jupyterlab/work:/home/jovyan/work
+      - ./docker_image/jupyterlab/conf/spark-defaults.conf:/usr/local/spark/conf/spark-defaults.conf
+    ports:
+      - "8888:8888"
+      - "4040:4040"
+    networks:
+      - data_network
+
+networks:
+  data_network:
+    driver: bridge
+    name: data_network
+
+# volumes:
+#   spark-data:
+#     driver: local
